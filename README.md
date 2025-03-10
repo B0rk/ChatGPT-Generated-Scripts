@@ -1,4 +1,4 @@
-### ChatGPT Generated Scripts
+# ChatGPT Generated Scripts
 A repository of ChatGPT generated scripts to help make life easier.
 
 ## update_repos.sh ## 
