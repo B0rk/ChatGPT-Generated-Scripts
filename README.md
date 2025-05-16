@@ -10,4 +10,7 @@ A PowerShell file used to disable realtime scanning permanently on a system. Thi
 *Note: Tamper Protection Must Manually be Disabled.*
 
 ## web_upload.py
-A Python upload script that creates a web gui to upload files to the server.
+A Python upload script that runs a web server to upload files to the host.
+
+## web_upload_commands.txt
+One-liners for PowerShell and Bash to upload files when using the web_upload.py script.
