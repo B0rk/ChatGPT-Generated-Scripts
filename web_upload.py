@@ -1,61 +1,129 @@
 #!/usr/bin/env python3
+"""
+File Upload Server
+
+This service provides:
+ - A web-based GUI (HTML form) for uploading any file
+ - Configurable save directory and listening port via CLI
+ - Listing of uploaded files with download links
+ - Basic error handling and user feedback
+"""
+
 import os
-from flask import Flask, request, render_template_string
+import argparse
+from flask import (
+    Flask, request, render_template_string, redirect,
+    url_for, flash, send_from_directory
+)
 from werkzeug.utils import secure_filename
 
-# Configuration: Files will be saved in the directory where this script is located.
-UPLOAD_FOLDER = os.path.abspath(os.path.dirname(__file__))
-
-# Utility function to allow all file types
-def allowed_file(filename):
-    # Return True to allow files with any extension.
-    return True
-
-# Initialize Flask app
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# HTML template for the upload page
-UPLOAD_PAGE = '''
+# HTML template for upload page
+UPLOAD_PAGE = """
 <!doctype html>
 <html>
   <head>
     <title>File Upload Service</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 2rem; }
+      h1 { color: #333; }
+      .messages { color: red; }
+      ul.files { list-style: none; padding: 0; }
+      ul.files li { margin: 0.5rem 0; }
+    </style>
   </head>
   <body>
     <h1>Upload a File</h1>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="messages">
+          <ul>
+          {% for msg in messages %}
+            <li>{{ msg }}</li>
+          {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    {% endwith %}
     <form method="post" enctype="multipart/form-data">
       <input type="file" name="file">
-      <input type="submit" value="Upload">
+      <button type="submit">Upload</button>
     </form>
+    <h2>Uploaded Files</h2>
+    <ul class="files">
+    {% for filename in files %}
+      <li><a href="{{ url_for('download_file', filename=filename) }}">{{ filename }}</a></li>
+    {% endfor %}
+    </ul>
   </body>
 </html>
-'''
+"""
 
-@app.route('/', methods=['GET', 'POST'])
-def upload_file():
-    if request.method == 'POST':
-        # Verify that a file part exists in the request
-        if 'file' not in request.files:
-            return 'Error: No file part in the request.', 400
+def create_app(upload_folder):
+    app = Flask(__name__)
+    app.config['UPLOAD_FOLDER'] = upload_folder
+    app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1 GiB max; adjust as needed
+    app.secret_key = os.urandom(16)
 
-        file = request.files['file']
-        # Check if the user submitted an empty file field
-        if file.filename == '':
-            return 'Error: No file selected for uploading.', 400
-
-        # Save the file after sanitizing the filename
-        if file and allowed_file(file.filename):
+    @app.route('/', methods=['GET', 'POST'])
+    def upload_file():
+        if request.method == 'POST':
+            # Verify 'file' part present
+            if 'file' not in request.files:
+                flash('No file part in the request.')
+                return redirect(request.url)
+            file = request.files['file']
+            # Check filename
+            if not file or file.filename == '':
+                flash('No file selected for uploading.')
+                return redirect(request.url)
+            # Sanitize and save
             filename = secure_filename(file.filename)
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(file_path)
-            return f'Success: File uploaded to {file_path}.', 200
-        else:
-            return 'Error: File type not allowed.', 400
+            dest = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            try:
+                file.save(dest)
+                flash(f'File “{filename}” uploaded successfully.')
+            except Exception as e:
+                flash(f'Error saving file: {e}')
+            return redirect(request.url)
 
-    # Render the upload form for GET requests
-    return render_template_string(UPLOAD_PAGE)
+        # GET: list files
+        try:
+            files = sorted(os.listdir(app.config['UPLOAD_FOLDER']))
+        except Exception:
+            files = []
+            flash('Could not list uploaded files.')
+        return render_template_string(UPLOAD_PAGE, files=files)
+
+    @app.route('/uploads/<filename>')
+    def download_file(filename):
+        return send_from_directory(
+            app.config['UPLOAD_FOLDER'], filename, as_attachment=True
+        )
+
+    return app
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Simple Python File Upload Server'
+    )
+    parser.add_argument(
+        '-p', '--port',
+        type=int, default=5000,
+        help='Port to listen on (default: 5000)'
+    )
+    parser.add_argument(
+        '-d', '--directory',
+        default=os.getcwd(),
+        help='Directory to save uploaded files (default: cwd)'
+    )
+    args = parser.parse_args()
+
+    # Validate upload directory
+    if not os.path.isdir(args.directory):
+        parser.error(f'Directory not found or not a directory: {args.directory}')
+
+    app = create_app(args.directory)
+    app.run(host='0.0.0.0', port=args.port)
 
 if __name__ == '__main__':
-    # For production, remove debug=True and properly configure the host and port as needed.
-    app.run(host='0.0.0.0', port=443, debug=False)
+    main()
