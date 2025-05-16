@@ -1,8 +1,8 @@
 PowerShell Invoke Web Request
-Invoke-WebRequest -Uri "https://<server_ip_or_hostname>/" -Method Post -InFile "C:\path\to\file.txt" -ContentType "multipart/form-data" -UseBasicParsing
+Invoke-WebRequest -Uri "https://<server_ip_or_hostname>:port/" -Method Post -InFile "C:\path\to\file.txt" -ContentType "multipart/form-data" -UseBasicParsing
 
 PowerShell Curl
-curl.exe -k -F "file=@C:\path\to\file.txt" https://<server_ip_or_hostname>/
+curl.exe -F "file=@C:\path\to\file.txt" https://<server_ip_or_hostname>:port/
 
 Bash Curl
-curl -k -F "file=@/path/to/file.txt" https://<server_ip_or_hostname>/
+curl -F "file=@/path/to/file.txt" https://<server_ip_or_hostname>:port/
